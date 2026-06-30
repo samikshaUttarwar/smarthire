@@ -1,41 +1,30 @@
 """
-SmartHire - NLP Engine
+SmartHire - NLP Engine (fast version, no heavy AI model)
 Handles text cleaning, skill extraction, fit scoring, and recommendations.
 """
 
 import re
 import nltk
-import spacy
 from nltk.corpus import stopwords
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from transformers import pipeline
 
 nltk.download('stopwords', quiet=True)
 nltk.download('punkt', quiet=True)
 
-nlp = spacy.load("en_core_web_sm")
-
-_classifier = None
-
-
-def _get_classifier():
-    global _classifier
-    if _classifier is None:
-        _classifier = pipeline(
-            "zero-shot-classification",
-            model="valhalla/distilbart-mnli-12-3"
-        )
-    return _classifier
-
 
 SKILL_LABELS = [
-    "Python", "JavaScript", "React", "Node.js", "Express.js",
-    "MongoDB", "SQL", "Java", "C++", "Machine Learning",
-    "Deep Learning", "NLP", "TensorFlow", "PyTorch", "AWS",
-    "Docker", "Kubernetes", "Git", "REST API", "GraphQL",
-    "HTML", "CSS", "TypeScript", "Data Structures", "Algorithms",
-    "Agile", "CI/CD", "Linux", "Firebase", "Redis"
+    "Python", "JavaScript", "React", "React.js", "Node.js", "Node",
+    "Express.js", "Express", "MongoDB", "SQL", "Java", "C++",
+    "Machine Learning", "ML", "Deep Learning", "NLP",
+    "TensorFlow", "PyTorch", "AWS", "Docker", "Kubernetes",
+    "Git", "GitHub", "REST API", "REST", "API", "GraphQL",
+    "HTML", "CSS", "TypeScript", "Data Structures", "DSA",
+    "Algorithms", "Agile", "CI/CD", "Linux", "Firebase", "Redis",
+    "JWT", "bcrypt", "OOP", "Postman", "Streamlit", "Pandas",
+    "NumPy", "scikit-learn", "Hugging Face", "LangChain",
+    "Prompt Engineering", "Groq", "LLaMA", "CST Studio",
+    "5G", "4G", "RF", "Microwave", "Antenna", "VSWR"
 ]
 
 
@@ -47,24 +36,23 @@ def clean_text(text):
 
 
 def extract_keywords(text):
-    doc = nlp(clean_text(text))
     stop = set(stopwords.words("english"))
-    keywords = [
-        token.lemma_ for token in doc
-        if not token.is_stop and not token.is_punct and len(token.text) > 2
-        and token.lemma_ not in stop
-    ]
+    cleaned = clean_text(text)
+    words = cleaned.split()
+    keywords = [w for w in words if w not in stop and len(w) > 2]
     return list(set(keywords))
 
 
 def extract_skills(text, labels=None):
     labels = labels or SKILL_LABELS
-    classifier = _get_classifier()
-    result = classifier(text[:1000], candidate_labels=labels, multi_label=True)
-    return [
-        label for label, score in zip(result["labels"], result["scores"])
-        if score > 0.5
-    ]
+    cleaned = clean_text(text)
+    found = []
+    for label in labels:
+        label_clean = clean_text(label)
+        pattern = r"\b" + re.escape(label_clean).replace(r"\ ", r"[\s\-]?") + r"\b"
+        if re.search(pattern, cleaned):
+            found.append(label)
+    return found
 
 
 def calculate_fit_score(resume_text, jd_text):
